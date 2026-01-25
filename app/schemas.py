@@ -126,7 +126,7 @@ class CampaignResponse(CampaignBase):
 
 class CampaignDetailResponse(CampaignResponse):
     """Detailed campaign response with contacts"""
-    contacts: List[ContactResponse] = []
+    contacts: Optional[List[ContactResponse]] = None
 
 
 class CampaignStats(BaseModel):

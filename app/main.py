@@ -14,7 +14,7 @@ from app.database import init_db, close_db
 from app.api import campaigns
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Configure logging
 logging.basicConfig(
@@ -73,13 +73,13 @@ app = FastAPI(
     - Managing campaign statistics
     
     ## Features
-    - ✅ Excel file upload support (.xlsx, .xls, .csv)
-    - ✅ Background processing with Celery
-    - ✅ Automatic phone number validation
-    - ✅ Message personalization with placeholders
-    - ✅ Retry mechanism for failed messages
-    - ✅ Real-time campaign statistics
-    - ✅ Comprehensive error handling
+    - Excel file upload support (.xlsx, .xls, .csv)
+    - Background processing with Celery
+    - Automatic phone number validation
+    - Message personalization with placeholders
+    - Retry mechanism for failed messages
+    - Real-time campaign statistics
+    - Comprehensive error handling
     """,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -136,7 +136,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error": "Validation Error",
             "detail": exc.errors(),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     )
 
@@ -150,7 +150,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal Server Error",
             "detail": str(exc) if settings.debug else "An unexpected error occurred",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     )
 
@@ -170,7 +170,7 @@ async def health_check():
         "status": "healthy",
         "version": settings.app_version,
         "environment": settings.environment,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 

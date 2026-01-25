@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.schemas import (
     CampaignCreate, CampaignUpdate, CampaignResponse, CampaignDetailResponse,
-    CampaignStats, ContactResponse, PaginationParams, PaginatedResponse, CampaignExecuteResponse, ContactBulkCreate, FileUploadResponse
+    CampaignStats, ContactResponse, MessageResponse, PaginationParams, PaginatedResponse, CampaignExecuteResponse, ContactBulkCreate, FileUploadResponse
 )
 from app.services import CampaignService, ContactService, MessageService
 from app.celery_tasks import send_bulk_sms, retry_failed_messages
 from app.models.campaign import CampaignStatus
 from app.config import settings
-from typing import List, Optional
+from typing import List, Optional, Union
 from pathlib import Path
 import shutil
 import logging
@@ -48,7 +48,8 @@ async def create_campaign(
     try:
         new_campaign = await CampaignService.create_campaign(db, campaign)
         await db.commit()
-        return new_campaign
+        # Convert SQLAlchemy model to Pydantic schema
+        return CampaignResponse.model_validate(new_campaign)
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating campaign: {str(e)}")
@@ -90,8 +91,14 @@ async def list_campaigns(
         
         total_pages = (total + page_size - 1) // page_size
         
+        # FIX: Convert SQLAlchemy models to Pydantic schemas
+        campaign_responses = [
+            CampaignResponse.model_validate(campaign) 
+            for campaign in campaigns
+        ]
+        
         return {
-            "items": campaigns,
+            "items": campaign_responses,
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -109,7 +116,7 @@ async def list_campaigns(
 
 @router.get(
     "/{campaign_id}",
-    response_model=CampaignDetailResponse,
+    response_model=Union[CampaignDetailResponse, CampaignResponse],
     summary="Get campaign details"
 )
 async def get_campaign(
@@ -117,19 +124,19 @@ async def get_campaign(
     include_contacts: bool = False,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """
-    Get detailed information about a specific campaign.
-    
-    - **campaign_id**: Campaign ID
-    - **include_contacts**: Include contact list in response (default: false)
-    """
     campaign = await CampaignService.get_campaign(db, campaign_id, include_contacts)
+    
     if not campaign:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Campaign {campaign_id} not found"
         )
-    return campaign
+
+    # 1. If contacts were requested and loaded, use the Detail schema
+    if include_contacts:
+        return CampaignDetailResponse.model_validate(campaign)
+    
+    return CampaignResponse.model_validate(campaign)
 
 
 @router.patch(
@@ -156,7 +163,8 @@ async def update_campaign(
                 detail=f"Campaign {campaign_id} not found"
             )
         await db.commit()
-        return updated_campaign
+        # Convert SQLAlchemy model to Pydantic schema
+        return CampaignResponse.model_validate(updated_campaign)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -258,11 +266,11 @@ async def add_contacts(
         
         await db.commit()
         
-        if errors:
-            logger.warning(f"Some contacts failed validation: {len(errors)} errors")
-        
+        # Return created contacts (already Pydantic models)
         return created_contacts
         
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error adding contacts to campaign {campaign_id}: {str(e)}")
@@ -275,23 +283,18 @@ async def add_contacts(
 @router.post(
     "/{campaign_id}/upload",
     response_model=FileUploadResponse,
-    summary="Upload Excel file with contacts"
+    summary="Upload contacts file"
 )
-async def upload_contacts_file(
+async def upload_contacts(
     campaign_id: int,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Upload an Excel file (.xlsx, .xls, .csv) with contacts for a campaign.
+    Upload an Excel/CSV file with contacts.
     
-    Expected columns:
-    - **name** (required): Contact name
-    - **phone_number** (required): Phone number
-    - **email** (optional): Email address
-    - Any additional columns will be stored as custom fields
-    
-    Maximum file size: 10MB
+    Required columns: name, phone_number
+    Optional columns: email, and any custom fields
     """
     try:
         # Verify campaign exists
@@ -509,10 +512,10 @@ async def get_campaign_messages(
         pagination = PaginationParams(page=page, page_size=page_size)
         
         # Parse status filter
-        status = None
+        msg_status = None
         if status_filter:
             try:
-                status = MessageStatus(status_filter)
+                msg_status = MessageStatus(status_filter)
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -520,13 +523,16 @@ async def get_campaign_messages(
                 )
         
         messages, total = await MessageService.get_campaign_messages(
-            db, campaign_id, status, pagination
+            db, campaign_id, msg_status, pagination
         )
         
         total_pages = (total + page_size - 1) // page_size
-        
+        messages_responses = [
+            MessageResponse.model_validate(message) 
+            for message in messages
+        ]
         return {
-            "items": messages,
+            "items": messages_responses,
             "total": total,
             "page": page,
             "page_size": page_size,

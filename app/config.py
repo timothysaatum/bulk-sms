@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
     celery_broker_url: str = Field(default="redis://localhost:6379/0", env="CELERY_BROKER_URL")
     celery_result_backend: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
+
     
     # Security
     secret_key: str = Field(..., env="SECRET_KEY")
@@ -57,7 +58,6 @@ class Settings(BaseSettings):
     
     # File Upload Settings
     max_upload_size: int = Field(default=10485760, env="MAX_UPLOAD_SIZE")  # 10MB
-    allowed_extensions: str = Field(default=".xlsx,.xls,.csv", env="ALLOWED_EXTENSIONS")
     upload_dir: str = Field(default="./uploads", env="UPLOAD_DIR")
     
     # Pagination
@@ -69,10 +69,8 @@ class Settings(BaseSettings):
     log_file: str = Field(default="./logs/app.log", env="LOG_FILE")
     
     # CORS Settings
-    cors_origins: str = Field(
-        default="http://localhost:3000,http://localhost:8080",
-        env="CORS_ORIGINS"
-    )
+    allowed_extensions: List[str] = ['.xlsx', '.xls', '.csv']
+    cors_origins: List[str] = ['http://localhost:3000', 'http://localhost:8080']
     
     # Rate Limiting
     rate_limit_per_minute: int = Field(default=60, env="RATE_LIMIT_PER_MINUTE")
@@ -115,6 +113,7 @@ class Settings(BaseSettings):
             "task_soft_time_limit": 3300,  # 55 minutes
             "worker_prefetch_multiplier": 1,
             "worker_max_tasks_per_child": 1000,
+            "broker_connection_retry_on_startup": True,
         }
     
     def create_upload_dir(self):

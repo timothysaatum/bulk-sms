@@ -2,13 +2,13 @@
 Database models for the Bulk SMS System
 """
 
+from app.base import Base
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Boolean, 
     ForeignKey, Enum as SQLEnum, Index, JSON, Float
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database import Base
 import enum
 from datetime import datetime
 

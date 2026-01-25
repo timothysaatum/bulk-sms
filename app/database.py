@@ -3,8 +3,9 @@ Database configuration and session management
 Supports both async and sync database operations
 """
 
+from app.base import Base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from app.config import settings
 import logging
@@ -48,7 +49,6 @@ SessionLocal = sessionmaker(
 )
 
 # Base class for models
-Base = declarative_base()
 
 
 async def get_async_db():
@@ -86,7 +86,13 @@ async def init_db():
     """Initialize database tables"""
     async with async_engine.begin() as conn:
         # Import all models here to ensure they're registered
-        from app.models import campaign, contact, message
+        from app.models import (
+            campaign, 
+            Contact,
+            MessageStatus,
+            APILog,
+            CampaignStatus
+        )
         
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
