@@ -70,8 +70,12 @@ class Settings(BaseSettings):
     
     # CORS Settings
     allowed_extensions: List[str] = ['.xlsx', '.xls', '.csv']
-    cors_origins: List[str] = ['http://localhost:3000', 'http://localhost:8080']
-    
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "https://hermis-six.vercel.app",
+        "https://hermis-mmjker1rh-timothy-saatums-projects-45b35e82.vercel.app",
+    ]
     # Rate Limiting
     rate_limit_per_minute: int = Field(default=60, env="RATE_LIMIT_PER_MINUTE")
     rate_limit_per_hour: int = Field(default=1000, env="RATE_LIMIT_PER_HOUR")
