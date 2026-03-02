@@ -5,7 +5,7 @@ Handles all application settings using Pydantic Settings
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, validator
-from typing import List
+from typing import Any
 import os
 
 
@@ -69,13 +69,15 @@ class Settings(BaseSettings):
     log_file: str = Field(default="./logs/app.log", env="LOG_FILE")
     
     # CORS Settings
-    allowed_extensions: List[str] = ['.xlsx', '.xls', '.csv']
-    cors_origins: List[str] = [
+    # Typed as Any so pydantic-settings v2 doesn't JSON-parse the comma-separated
+    # .env value before our @validator runs. Validators coerce it to List[str].
+    allowed_extensions: Any = Field(default=['.xlsx', '.xls', '.csv'])
+    cors_origins: Any = Field(default=[
         "http://localhost:3000",
         "http://localhost:8080",
         "https://hermis-six.vercel.app",
         "https://hermis-mmjker1rh-timothy-saatums-projects-45b35e82.vercel.app",
-    ]
+    ])
     # Rate Limiting
     rate_limit_per_minute: int = Field(default=60, env="RATE_LIMIT_PER_MINUTE")
     rate_limit_per_hour: int = Field(default=1000, env="RATE_LIMIT_PER_HOUR")
@@ -96,8 +98,15 @@ class Settings(BaseSettings):
     
     @validator("allowed_extensions", pre=True)
     def parse_allowed_extensions(cls, v):
-        """Parse allowed extensions from comma-separated string"""
+        """Parse allowed extensions from comma-separated string or JSON array"""
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
             return [ext.strip() for ext in v.split(",")]
         return v
     

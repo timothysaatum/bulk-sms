@@ -11,6 +11,7 @@ from app.models.campaign import (
     CampaignStatus,
     MessageStatus
 )
+from app.models.job_queue_model import JobQueue
 
 __all__ = [
     "Campaign",
@@ -19,4 +20,5 @@ __all__ = [
     "APILog",
     "CampaignStatus",
     "MessageStatus",
+    "JobQueue"
 ]

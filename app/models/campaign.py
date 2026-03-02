@@ -10,7 +10,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from datetime import datetime
 
 
 class CampaignStatus(str, enum.Enum):

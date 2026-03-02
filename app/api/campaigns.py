@@ -11,7 +11,7 @@ from app.schemas import (
     CampaignStats, ContactResponse, MessageResponse, PaginationParams, PaginatedResponse, CampaignExecuteResponse, ContactBulkCreate, FileUploadResponse
 )
 from app.services import CampaignService, ContactService, MessageService
-from app.celery_tasks import send_bulk_sms, retry_failed_messages
+from app.queue_manager import QueueManager
 from app.models.campaign import CampaignStatus
 from app.config import settings
 from typing import List, Optional, Union
@@ -412,19 +412,20 @@ async def execute_campaign(
         campaign.status = CampaignStatus.PROCESSING
         await db.commit()
         
-        # Queue background task
-        task = send_bulk_sms.delay(campaign_id)
-        
+        # Queue background task via PostgreSQL job queue
+        job = await QueueManager.enqueue_send_bulk_sms(db, campaign_id)
+        await db.commit()
+
         # Estimate duration based on rate limit
         estimated_minutes = (message_count / settings.sms_rate_limit)
-        
-        logger.info(f"Queued campaign {campaign_id} for execution. Task ID: {task.id}")
-        
+
+        logger.info(f"Queued campaign {campaign_id} for execution. Job ID: {job.id}")
+
         return {
             "campaign_id": campaign_id,
             "status": "queued",
             "message": f"Campaign queued for execution. {message_count} messages will be sent.",
-            "task_id": task.id,
+            "task_id": str(job.id),
             "total_contacts": message_count,
             "estimated_duration_minutes": round(estimated_minutes, 2)
         }
@@ -462,14 +463,15 @@ async def retry_failed(
                 detail=f"Campaign {campaign_id} not found"
             )
         
-        # Queue retry task
-        task = retry_failed_messages.delay(campaign_id)
-        
+        # Queue retry task via PostgreSQL job queue
+        job = await QueueManager.enqueue_retry_failed_messages(db, campaign_id)
+        await db.commit()
+
         return {
             "campaign_id": campaign_id,
             "status": "queued",
             "message": "Failed messages queued for retry",
-            "task_id": task.id
+            "task_id": str(job.id)
         }
         
     except HTTPException:
